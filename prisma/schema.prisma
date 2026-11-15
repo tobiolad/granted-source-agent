@@ -1,0 +1,119 @@
+// Prisma schema for the AI Grant Research & Intelligence Platform.
+//
+// Note: the "sqlite" connector does not support native enums, so status/category
+// fields are plain strings, validated against a fixed set at the application
+// boundary (see lib/validation.ts) rather than at the database level.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// A funding opportunity discovered by the agent (demo or live) or entered manually.
+// Fields are split into three groups:
+//   1. Facts the research step extracted (ai* / unprefixed descriptive fields)
+//   2. What a human has confirmed about those facts (review* fields)
+//   3. Workflow state (status)
+// This separation is the core of "AI suggests, human decides."
+model Opportunity {
+  id       String @id @default(cuid())
+  grantName String
+  funderName String?
+  programUrl String
+
+  country       String // "Canada" | "United States" | "Canada/US"
+  region        String?
+  category      String // Startup | Nonprofit | Research | Small Business | Youth | Women | BIPOC | Climate | Tech | Arts | Mixed
+  fundingType   String // Grant | Loan | Prize | Accelerator | Tax Credit | Other
+  applicantType String?
+  sourceType    String // Government website | Foundation website | Accelerator | University | Nonprofit | Other
+
+  amount   String? // free text, as extracted — "Not stated" if unknown
+  deadline String? // free text, as extracted — "Unknown" if unverifiable
+  urgency  String? // Closing Soon | Open | Rolling | Unknown | Closed
+
+  eligibilitySummary String?
+  discoveryNote      String?
+  applicationAngle   String?
+
+  // AI's own confidence in the match — NOT a human decision.
+  aiFitScore        String? // High | Medium | Low
+  aiEligibilityGuess String? // Likely | Possible | Unlikely
+  aiFitReasoning     String?
+
+  // Fields the research step could not confirm (JSON string array), surfaced
+  // explicitly instead of silently defaulting or guessing.
+  missingFields String? // JSON: string[]
+
+  // Human review layer — separate from the AI's assessment above.
+  reviewStatus String  @default("unreviewed") // unreviewed | verified | uncertain | rejected
+  reviewNotes  String?
+
+  // Pipeline/workflow status, set by the user as they work the opportunity.
+  status String @default("new") // new | reviewed | applying | applied | rejected | saved
+
+  discoverySource String   @default("demo") // demo | live
+  discoveredAt    DateTime @default(now())
+
+  citations   Citation[]
+  evaluations Evaluation[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+  @@index([reviewStatus])
+  @@index([country])
+  @@unique([programUrl, grantName])
+}
+
+// A real source URL backing an opportunity. For live discovery these come
+// from Gemini's search-grounding metadata, not from the model's free-text
+// claims, specifically to avoid citing a hallucinated source.
+model Citation {
+  id            String      @id @default(cuid())
+  opportunityId String
+  opportunity   Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  url           String
+  title         String?
+  createdAt     DateTime    @default(now())
+}
+
+// The organization profile an opportunity is evaluated against. Single-row
+// table for this project's scope (one researcher, one org at a time).
+model OrgProfile {
+  id            String   @id @default("default")
+  orgName       String
+  orgType       String // Startup | Nonprofit | Small Business | Research | Social Enterprise | Other
+  country       String
+  region        String?
+  stage         String? // Idea | Early revenue | Growth | Established
+  teamSize      String?
+  description   String?
+  fundingNeeded String?
+  updatedAt     DateTime @updatedAt
+}
+
+// A saved fit evaluation of one opportunity against the org profile at the
+// time it was run. Kept as history rather than overwritten, so a user can see
+// how the AI's assessment evolved as the profile or opportunity changed.
+model Evaluation {
+  id            String      @id @default(cuid())
+  opportunityId String
+  opportunity   Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+
+  fitScore         String // High | Medium | Low
+  fitReasoning     String // explainable — why this score, not just the label
+  eligibilityNotes String
+  restrictions     String?
+  missingInfo      String // JSON: string[]
+  nextActions      String // JSON: string[]
+
+  evaluatedAgainstOrg String // org name snapshot, for history clarity
+  source              String   @default("demo") // demo | live
+  createdAt           DateTime @default(now())
+}
