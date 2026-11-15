@@ -1,0 +1,151 @@
+{
+  "generatedAt": "2026-11-15T09:27:52.157Z",
+  "note": "Fixture-based pipeline evaluation — see eval/README.md. Not a live-model benchmark.",
+  "overall": {
+    "passed": 11,
+    "total": 12
+  },
+  "byDimension": {
+    "extraction": {
+      "total": 6,
+      "passed": 6
+    },
+    "citation": {
+      "total": 3,
+      "passed": 3
+    },
+    "missing_fields": {
+      "total": 2,
+      "passed": 2
+    },
+    "duplicates": {
+      "total": 3,
+      "passed": 3
+    },
+    "hallucination": {
+      "total": 1,
+      "passed": 1
+    },
+    "eligibility": {
+      "total": 2,
+      "passed": 1
+    }
+  },
+  "cases": [
+    {
+      "id": "clean-single",
+      "description": "A single well-formed candidate with a matching grounding citation.",
+      "dimensions": [
+        "extraction",
+        "citation"
+      ],
+      "pass": true,
+      "failures": []
+    },
+    {
+      "id": "invalid-category",
+      "description": "A candidate using a category outside the fixed vocabulary — must be rejected, not coerced.",
+      "dimensions": [
+        "extraction"
+      ],
+      "pass": true,
+      "failures": []
+    },
+    {
+      "id": "malformed-url",
+      "description": "A candidate whose program_url isn't a real URL — must be rejected.",
+      "dimensions": [
+        "extraction"
+      ],
+      "pass": true,
+      "failures": []
+    },
+    {
+      "id": "placeholder-values",
+      "description": "A valid candidate that honestly reports unknown amount/deadline/eligibility instead of guessing.",
+      "dimensions": [
+        "missing_fields"
+      ],
+      "pass": true,
+      "failures": []
+    },
+    {
+      "id": "no-citations",
+      "description": "A valid candidate but the discovery call returned zero grounding citations.",
+      "dimensions": [
+        "missing_fields",
+        "citation"
+      ],
+      "pass": true,
+      "failures": []
+    },
+    {
+      "id": "duplicate-within-batch",
+      "description": "The same program returned twice in one response, with a trivially different URL form.",
+      "dimensions": [
+        "duplicates",
+        "extraction"
+      ],
+      "pass": true,
+      "failures": []
+    },
+    {
+      "id": "duplicate-against-existing",
+      "description": "A re-run of a prior search returns a program already stored from an earlier discovery run.",
+      "dimensions": [
+        "duplicates"
+      ],
+      "pass": true,
+      "failures": []
+    },
+    {
+      "id": "citation-domain-mismatch",
+      "description": "Grounding returned a citation, but it points at a different domain than the claimed program_url — a concrete, checkable hallucination signal.",
+      "dimensions": [
+        "citation",
+        "hallucination"
+      ],
+      "pass": true,
+      "failures": []
+    },
+    {
+      "id": "wrapped-in-prose-and-fence",
+      "description": "A valid candidate, but the model wrapped it in a markdown code fence and a sentence of commentary.",
+      "dimensions": [
+        "extraction"
+      ],
+      "pass": true,
+      "failures": []
+    },
+    {
+      "id": "eligibility-mismatch",
+      "description": "Program is explicitly restricted to women-owned businesses; the organization profile doesn't match, but the model still rates it High.",
+      "dimensions": [
+        "eligibility"
+      ],
+      "pass": false,
+      "failures": [
+        "eligibility[Women Founders Fund]: model said \"High\", labeled expectation is \"Low\" — flag for human review, not a pipeline defect"
+      ]
+    },
+    {
+      "id": "eligibility-match",
+      "description": "Program targeting youth founders, model rates it Medium for a youth-founder applicant — a reasonable, non-overconfident score.",
+      "dimensions": [
+        "eligibility"
+      ],
+      "pass": true,
+      "failures": []
+    },
+    {
+      "id": "mixed-batch",
+      "description": "A realistic batch: one clean candidate, one invalid candidate, and a duplicate of the clean one.",
+      "dimensions": [
+        "extraction",
+        "duplicates"
+      ],
+      "pass": true,
+      "failures": []
+    }
+  ]
+}
